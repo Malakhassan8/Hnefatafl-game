@@ -85,7 +85,7 @@ print_cols(_, _, 11) :- !.  % stop when we reach column 11
 print_cols(Board, Row, Col) :-
     Col < 11,
     get_piece(Board, Row, Col, Piece),
-    piece_char(Piece, Role),
+    piece_role(Piece, Role),
     write(Role), write('   '), 
     NewCol is Col + 1,
     print_cols(Board, Row, NewCol).
