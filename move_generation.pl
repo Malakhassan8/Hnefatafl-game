@@ -36,7 +36,7 @@ can_slide(Board,FR,FC,FR,TC):-
     FC =\= TC,    % must move
     get_piece(Board, FR, TC, empty),    % Forces destination to be empty
     \+ (special_cell(FR, TC), \+ get_piece(Board, FR, FC, king)),    
-    path_clear_horizontal(Board, FR, FC, TC).  % Nothing blocking the path
+    clear_horizontal_path(Board, FR, FC, TC).  % Nothing blocking the path
 
 
 % Vertical move
@@ -44,21 +44,21 @@ can_slide(Board,FR,FC,TR,FC):-
     FR =\= TR ,   % must move
     get_piece(Board, TR, FC, empty),    % Forces destination to be empty
     \+ (special_cell(TR, FC), \+ get_piece(Board, FR, FC, king)),    
-    path_clear_vertical(Board, FC, FR, TR).  % Nothing blocking the path
+   clear_vertical_path(Board, FC, FR, TR).  % Nothing blocking the path
 
 
 
-% path_clear_horizontal(Board, Row, FromCol, ToCol)
+%clear_horizontal_path(Board, Row, FromCol, ToCol)
 % Checks all squares BETWEEN FromCol and ToCol on the same row
 % are empty (does not check the destination itself)
 
-path_clear_horizontal(Board,Row,FC,TC):-
+clear_horizontal_path(Board,Row,FC,TC):-
     FC < TC,    %moving right
     Mid is FC + 1,
     all_empty_cols(Board,Row,Mid,TC).
     
     
-path_clear_horizontal(Board,Row,FC,TC):-
+clear_horizontal_path(Board,Row,FC,TC):-
     FC > TC,     %moving left
     Mid is TC + 1,
     all_empty_cols(Board,Row,Mid,FC).
@@ -76,19 +76,19 @@ all_empty_cols(Board,Row,C,Limit):-  % Recursive case
    
 
 
-% path_clear_vertical(Board, Col, FromCol, ToCol)
+% clear_vertical_path(Board, Col, FromCol, ToCol)
 % Checks all squares BETWEEN FromRow and ToRow on the same col
 % are empty (does not check the destination itself)
 
 
-path_clear_vertical(Board,Col,FR,TR):-
+clear_vertical_path(Board,Col,FR,TR):-
     FR < TR ,
     Mid is FR + 1,
     all_empty_rows(Board,Col,Mid,TR).
 
 
 
-path_clear_vertical(Board,Col,FR,TR):-
+clear_vertical_path(Board,Col,FR,TR):-
       FR > TR ,
     Mid is TR + 1,
     all_empty_rows(Board,Col,Mid,FR).
