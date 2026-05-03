@@ -63,17 +63,28 @@ setup_board(Board) :-
 
 
  % Print the board
+
+ % Print the board
 print_board(Board) :-
     nl,
-    write('   0  1  2  3  4  5  6  7  8  9  10'), nl,
-    print_rows(Board, 0). % start from row 0
+    write('    '),
+    print_header(0),
+    nl,
+    print_rows(Board, 0).
+
+
+print_header(11) :- !.
+print_header(N) :-
+    format('~|~` t~d~3+', [N]),  % fixed width spacing
+    N1 is N + 1,
+    print_header(N1).    
 
 
 print_rows(_, 11) :- !. % stop when we reach row 11 
 
 print_rows(Board, Row) :-
     Row < 11,
-    (Row < 10 -> write(' '), write(Row), write('  ') ; write(Row), write('  ')),
+    format('~|~` t~d~3+ ', [Row]),
     print_cols(Board, Row, 0), % Print all columns for this row 
     nl,
     NewRow is Row + 1,
@@ -86,7 +97,7 @@ print_cols(Board, Row, Col) :-
     Col < 11,
     get_piece(Board, Row, Col, Piece),
     piece_role(Piece, Role),
-    write(Role), write('   '), 
+    format('~|~` t~w~3+', [Role]), 
     NewCol is Col + 1,
     print_cols(Board, Row, NewCol).
 
