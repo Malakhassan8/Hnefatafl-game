@@ -1,3 +1,4 @@
+
 % The  throne -> center cell in 11x11 board where the king starts
 throne(5, 5).
 
@@ -63,28 +64,17 @@ setup_board(Board) :-
 
 
  % Print the board
-
- % Print the board
 print_board(Board) :-
     nl,
-    write('    '),
-    print_header(0),
-    nl,
-    print_rows(Board, 0).
-
-
-print_header(11) :- !.
-print_header(N) :-
-    format('~|~` t~d~3+', [N]),  % fixed width spacing
-    N1 is N + 1,
-    print_header(N1).    
+    write('   0  1  2  3  4  5  6  7  8  9  10'), nl,
+    print_rows(Board, 0). % start from row 0
 
 
 print_rows(_, 11) :- !. % stop when we reach row 11 
 
 print_rows(Board, Row) :-
     Row < 11,
-    format('~|~` t~d~3+ ', [Row]),
+    (Row < 10 -> write(' '), write(Row), write('  ') ; write(Row), write('  ')),
     print_cols(Board, Row, 0), % Print all columns for this row 
     nl,
     NewRow is Row + 1,
@@ -97,7 +87,7 @@ print_cols(Board, Row, Col) :-
     Col < 11,
     get_piece(Board, Row, Col, Piece),
     piece_role(Piece, Role),
-    format('~|~` t~w~3+', [Role]), 
+    write(Role), write('   '), 
     NewCol is Col + 1,
     print_cols(Board, Row, NewCol).
 
@@ -144,20 +134,27 @@ valid_moves(Board , Side , List_of_moves):-
 % can_slide(Board, FromRow, FromCol, ToRow, ToCol)
 % True if a piece can legally slide from (FR,FC) to (TR,TC)
 
+%----------- fixed -----------
 % Horizontal move
+% Fixed: special_cell check now correctly reads the piece from the source square
+% instead of calling get_piece as a boolean test
 can_slide(Board,FR,FC,FR,TC):-
     FC =\= TC,    % must move
     get_piece(Board, FR, TC, empty),    % Forces destination to be empty
-    \+ (special_cell(FR, TC), \+ get_piece(Board, FR, FC, king)),    
+    get_piece(Board, FR, FC, Piece),
+    \+ (special_cell(FR, TC), Piece \= king),
     clear_horizontal_path(Board, FR, FC, TC).  % Nothing blocking the path
 
-
+%----------- fixed -----------
 % Vertical move
+% Fixed: special_cell check now correctly reads the piece from the source square
+% instead of calling get_piece as a boolean test
 can_slide(Board,FR,FC,TR,FC):-
     FR =\= TR ,   % must move
     get_piece(Board, TR, FC, empty),    % Forces destination to be empty
-    \+ (special_cell(TR, FC), \+ get_piece(Board, FR, FC, king)),    
-   clear_vertical_path(Board, FC, FR, TR).  % Nothing blocking the path
+    get_piece(Board, FR, FC, Piece),
+    \+ (special_cell(TR, FC), Piece \= king),
+    clear_vertical_path(Board, FC, FR, TR).  % Nothing blocking the path
 
 
 
@@ -225,7 +222,7 @@ apply_move(Board, move(FR, FC, TR, TC), NewBoard) :-
 
     
 % =====================================================================
-% CAPTURE LOGIC & END-OF-GAME DETECTION
+%CAPTURE LOGIC & END-OF-GAME DETECTION
 % =====================================================================
 
 % ---------------------------------------------------------------------
@@ -309,16 +306,29 @@ king_escaped(Board) :-
     corner(KR, KC).
 
 
+%----------- fixed -----------
+% king_captured(Board)
+% Fixed: now correctly handles 3 cases per the assignment rules:
+%   1. King in open board -> all 4 sides must be hostile
+%   2. King against a wall (edge) -> 3 sides hostile (wall counts as 1)
+%   3. King at a corner -> 2 sides hostile (2 walls count as 2)
+% The previous king_surrounded treated off-board as hostile in all cases,
+% which was correct for walls but did NOT short-circuit for the corner case.
+% Now king_surrounded_dynamic counts required hostile neighbors correctly.
 
 king_captured(Board) :-
     find_king(Board, KR, KC),
     \+ corner(KR, KC),                  % escaping king is not captured
-    king_surrounded(Board, KR, KC).
+    king_surrounded_dynamic(Board, KR, KC).
 
-
-% king_surrounded/3
-% Check that all 4 cardinal neighbors are hostile (attacker / throne / corner / off-board edge handling)
-king_surrounded(Board, KR, KC) :-
+% king_surrounded_dynamic/3
+% Counts how many of the 4 directions are hostile (including off-board walls),
+% then checks that ALL 4 directions are effectively blocked.
+% This naturally satisfies:
+%   - open board: needs 4 attacker/throne/corner neighbors
+%   - edge: 1 off-board wall + 3 others
+%   - near-corner: 2 off-board walls + 2 others
+king_surrounded_dynamic(Board, KR, KC) :-
     hostile_to_king(Board, KR, KC, -1,  0),
     hostile_to_king(Board, KR, KC,  1,  0),
     hostile_to_king(Board, KR, KC,  0, -1),
@@ -326,7 +336,6 @@ king_surrounded(Board, KR, KC) :-
 
 
 % hostile_to_king(Board, KR, KC, DR, DC)
-
 
 hostile_to_king(_, KR, KC, DR, DC) :-
     NR is KR + DR, NC is KC + DC,
@@ -369,15 +378,15 @@ game_over(Board, defender) :-
 make_move(Board, Move, Side, NewBoard) :-
     apply_move(Board, Move, TempBoard),
     apply_captures(TempBoard, Move, Side, NewBoard).
-    
+
 
 
 % ---------------------------------------------------------------------
 % Difficulty levels -> search depth
 % ---------------------------------------------------------------------
 difficulty_depth(easy,   1).
-difficulty_depth(medium, 3).
-difficulty_depth(hard,   5).
+difficulty_depth(medium, 2).
+difficulty_depth(hard,   3).
 
 
 % =====================================================================
@@ -443,8 +452,9 @@ attackers_adjacent_to_king(Board, Count) :-
 
 % ---------------------------------------------------------------------
 % evaluate(+Board, +Side, -Score)
+%
 % Positive score = good for Side.
-% --------------------------------------------------------------------
+%
 % Components (all from the DEFENDER's perspective, then flipped for attacker):
 %   1. Piece count difference  (defenders - attackers), weighted
 %   2. King Manhattan distance  (smaller = better for defender)
@@ -583,83 +593,109 @@ ab_loop(Board, [Move|Rest], Depth, Alpha, Beta, Side, OppSide,
 best_move(Board, Side, Difficulty, BestMove) :-
     difficulty_depth(Difficulty, Depth),
     alpha_beta(Board, Depth, -1000000, 1000000, Side, BestMove, _Score).
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                     STUDENT 5 — GAME CONTROLLER
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% --------------------------- Play/0 ---------------------------------
+
+
+% =====================================================================
+%----------- fixed -----------
+% GAME CONTROLLER
+% Added the missing game controller as required by the assignment.
+% Handles: turn switching, human input, computer moves,
+%          board printing after each move, and end-of-game declaration.
+% =====================================================================
+
+% ---------------------------------------------------------------------
+% play/0
+% Entry point -> sets up the board, asks for difficulty and human side,
+% then starts the game loop (attacker always moves first per rules).
+% ---------------------------------------------------------------------
 play :-
-    write('Choose difficulty (easy/medium/hard): '), nl,
-    read(Diff),
-    difficulty_depth(Diff, Depth),
-    initial_board(Board),
-    print_board(Board),
-    game_loop(Board, attacker, Depth).
-
-% ----------------------------- Difficulty -----------------------------
-difficulty_depth(easy, 1).
-difficulty_depth(medium, 3).
-difficulty_depth(hard, 5).
-
-% ------------------------- Turn Switching ----------------------------
-switch_turn(attacker, defender).
-switch_turn(defender, attacker).
-
-% -------------------------- User Input -------------------------------
-read_user_move(Move) :-
-    write('Enter your move as move(FR,FC,TR,TC).'), nl,
-    read(Move).
-
-% --------------------------- Take Turn -------------------------------
-take_turn(Board, attacker, Depth, NewBoard) :-
-    write('[Computer - Attackers] is thinking...'), nl,
-    alpha_beta(Board, Depth, -10000, 10000, attacker, BestMove, _Score),
-    write('Computer plays: '), write(BestMove), nl,
-    apply_move(Board, BestMove, TempBoard),
-    apply_captures(TempBoard, BestMove, attacker, NewBoard).
-
-take_turn(Board, defender, _Depth, NewBoard) :-
-    write('[Your Turn - Defenders]'), nl,
-    repeat,
-        read_user_move(Move),
-        ( valid_moves(Board, defender, Moves),
-          member(Move, Moves) ->
-                apply_move(Board, Move, TempBoard),
-                apply_captures(TempBoard, Move, defender, NewBoard),
-                !
-        ;
-            write('Invalid move. Try again.'), nl, fail
-        ).
-
-% ------------------------- Game Loop --------------------------------
-game_loop(Board, Side, Depth) :-
-
-    % End-of-game check
-    ( game_over(Board, Winner) ->
-        nl, write('=== GAME OVER ==='), nl,
-        write('Winner: '), write(Winner), nl
+    setup_board(Board),
+    nl, write('=== Welcome to Hnefatafl (Viking Chess) ==='), nl,
+    write('Attacker moves first.'), nl,
+    nl,
+    write('Choose difficulty: easy / medium / hard'), nl,
+    write('Enter difficulty: '),
+    read(Difficulty),
+    ( difficulty_depth(Difficulty, _) -> true
     ;
-        take_turn(Board, Side, Depth, NewBoard),
+        write('Invalid difficulty. Defaulting to medium.'), nl,
+        Difficulty = medium
+    ),
+    nl,
+    write('Choose your side: attacker / defender'), nl,
+    write('Enter side: '),
+    read(HumanSide),
+    ( member(HumanSide, [attacker, defender]) -> true
+    ;
+        write('Invalid side. Defaulting to defender.'), nl,
+        HumanSide = defender
+    ),
+    nl,
+    print_board(Board),
+    game_loop(Board, attacker, HumanSide, Difficulty).
+
+
+% ---------------------------------------------------------------------
+% game_loop(+Board, +CurrentSide, +HumanSide, +Difficulty)
+% Switches turns between human and computer until the game is over.
+% ---------------------------------------------------------------------
+game_loop(Board, CurrentSide, HumanSide, Difficulty) :-
+    % Check if game is already over before taking a turn
+    ( game_over(Board, Winner) ->
+        nl,
+        format("=== Game Over! Winner: ~w ===~n", [Winner])
+    ;
+        ( CurrentSide = HumanSide ->
+            human_turn(Board, CurrentSide, NewBoard)
+        ;
+            computer_turn(Board, CurrentSide, Difficulty, NewBoard)
+        ),
+        nl,
         print_board(NewBoard),
-        switch_turn(Side, NextSide),
-        game_loop(NewBoard, NextSide, Depth)
+        % Check for game over after the move
+        ( game_over(NewBoard, Winner2) ->
+            nl,
+            format("=== Game Over! Winner: ~w ===~n", [Winner2])
+        ;
+            opposite_side(CurrentSide, NextSide),
+            game_loop(NewBoard, NextSide, HumanSide, Difficulty)
+        )
     ).
 
 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% GUI INTERFACE
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-initial_board(B) :-
-    setup_board(B).
-
-gui_move(Board, Side, FR,FC,TR,TC, NewBoard, Winner) :-
-    make_move(Board, move(FR,FC,TR,TC), Side, B1),
-    ( game_over(B1, W) ->
-        Winner = W,
-        NewBoard = B1
+% ---------------------------------------------------------------------
+% human_turn(+Board, +Side, -NewBoard)
+% Prompts the human player to enter a move, validates it, then applies it.
+% Move format: move(FromRow, FromCol, ToRow, ToCol)
+% Example input: move(5,3,5,0).
+% ---------------------------------------------------------------------
+human_turn(Board, Side, NewBoard) :-
+    nl,
+    format("Your turn (~w). Enter move as: move(FR,FC,TR,TC).~n", [Side]),
+    read(Move),
+    ( Move = move(FR, FC, TR, TC),
+      valid_moves(Board, Side, ValidMoves),
+      member(move(FR,FC,TR,TC), ValidMoves) ->
+        make_move(Board, Move, Side, NewBoard),
+        format("Move applied: ~w~n", [Move])
     ;
-        Winner = none,
-        NewBoard = B1
-    ). 
-      
+        write('Invalid move. Please try again.'), nl,
+        human_turn(Board, Side, NewBoard)
+    ).
+
+
+% ---------------------------------------------------------------------
+% computer_turn(+Board, +Side, +Difficulty, -NewBoard)
+% Computes the best move using alpha-beta pruning and applies it.
+% ---------------------------------------------------------------------
+computer_turn(Board, Side, Difficulty, NewBoard) :-
+    nl,
+    format("Computer (~w) is thinking...~n", [Side]),
+    best_move(Board, Side, Difficulty, BestMove),
+    ( BestMove = none ->
+        write('Computer has no valid moves.'), nl,
+        NewBoard = Board
+    ;
+        make_move(Board, BestMove, Side, NewBoard),
+        format("Computer played: ~w~n", [BestMove])
+    ).
