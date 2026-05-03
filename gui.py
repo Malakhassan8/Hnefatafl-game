@@ -9,8 +9,8 @@ def query_prolog(query):
     cmd = [
         r"C:\Program Files\swipl\bin\swipl.exe",
         "-q",
-        "-s", r"C:\Users\lenovo\Downloads\Hnefatafl-game-main\Hnefatafl-game-main\game.pl",
-        "-g", query,
+        "-s", r"C:\Users\lenovo\Downloads\Hnefatafl-game-main\Hnefatafl-game-main\whole_code _so_far.pl",
+        "-g", query
         "-t", "halt"
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
